@@ -13,73 +13,120 @@ import javafx.scene.control.Button;
  */
 public class TicTacToeController {
 
-    private ButtonClickManager manager;
-    private int updateCounter;
+    private final ButtonClickManager manager;
     private boolean isGameOver;
+    private GameStatusEnum winner;
 
     public TicTacToeController(ButtonClickManager manager) {
-        // X always makes the first turn
         this.manager = manager;
         this.isGameOver = false;
-        this.updateCounter = 0;
+        this.winner = null;
     }
 
     public void updateTile(Button btn, int column, int row) {
-        if (isGameOver) {
-            return; // Prevents further moves after the game is over
+        // Prevents further moves after the game is over
+        if (isGameOver()) {
+            return;
         }
+
         // X is always TRUE
         // O is always FALSE
-        String currentTurnSymbol = this.manager.getTurnSymbol();
-        this.updateCounter++;
+        // Retrieves current Enum symbol
+        GameStatusEnum currentTurnSymbol = this.manager.getTurnSymbol();
 
-        // If tile is not occupied, sets turn text
-        // Registers tile in the referenceArray as occupied by setting 0 to 1
-        // Changes current turn's turn to opposite
-        // TRUE becomes FALSE and vice versa
+        // Counts clicks, used specifically for DRAW triggering
+        this.manager.updateClickCounter();
+
+        // If tile is not occupied, sets correct turn symbol on a pressed Button
+        // Registers tile in the referenceArray as occupied 
+        // by setting 0 to 1 or -1 (Check GameStatusEnum)
+        // Changes current turn's symbol to the different, 
+        // once the button was clicked
+        // TRUE (X) becomes FALSE (O) and vice versa
         if (!this.manager.isTileOccupied(column, row)) {
-            btn.setText(currentTurnSymbol);
+            btn.setText(currentTurnSymbol.getMessage());
             this.manager.setTileOccupied(column, row);
+            // Once current symbol is set, it's value is updated
             this.manager.updateTurn();
 
             // Checks game status after each move
-            String status = checkGameStatus(column, row);
-            if (status != null) {
-                System.out.println(status); // Winner or DRAW
-                this.isGameOver = true;  // Stops the game after win/draw
-            }
+            calculateWinner(column, row);
+            updateGameStatus();
         }
     }
 
-    // GOTTA REWORK checkGameStatus() and getWinner()
-    public String checkGameStatus(int column, int row) {
-        String winner = getWinner(column, row);
-        return winner;
+    // Checks game status each time a button is pressed
+    public GameStatusEnum getGameResult() {
+        return this.winner;
     }
 
-    private String getWinner(int column, int row) {
-        int rowSum = calculateSingleRowSum(row);
-        int columnSum = calculateSingleColumnSum(column);
+    public boolean isGameOver() {
+        return this.isGameOver;
+    }
 
-        // Only checks diagonals if the move is on a diagonal
-        int mainDiagonalSum = (row == column) ? calculateMainDiagonal() : 0;
-        int secondaryDiagonalSum = (row + column == this.manager.getReferenceArraySize() - 1) ? calculateSecondaryDiagonal() : 0;
+    // Updates game status each time a button is pressed
+    private void updateGameStatus() {
+        if (this.winner != null) {
+            System.out.println(this.winner); // Winner or DRAW
+            this.isGameOver = true;  // Stops the game after win/draw
+        }
+    }
 
-        if (rowSum == 3 || columnSum == 3 || mainDiagonalSum == 3 || secondaryDiagonalSum == 3) {
-            return "X wins!";
-        } else if (rowSum == -3 || columnSum == -3 || mainDiagonalSum == -3 || secondaryDiagonalSum == -3) {
-            return "O wins!";
+    // Calculates winner each time the Button is pressed
+    private void calculateWinner(int column, int row) {
+        // Checks for draw first if all tiles are occupied
+        if (this.manager.getClickCounter() >= this.manager.getTilesSize()) {
+            this.winner = GameStatusEnum.DRAW;  // It's a draw
+            return;
         }
 
-        // Checks for draw
-        if (this.updateCounter >= this.manager.getTilesSize()) {
-            return "DRAW";
-        }
+        // Checks if current row or column has a winner
+        GameStatusEnum potentialWinner = checkRowAndColumnWinner(column, row);
+        assignWinner(potentialWinner);
 
+        // Checks diagonals only if necessary
+        if (potentialWinner == null) {
+            potentialWinner = checkDiagonalWinner(column, row);
+            assignWinner(potentialWinner);
+        }
+    }
+
+    private GameStatusEnum checkRowAndColumnWinner(int column, int row) {
+        // Calculates row and column sums for the current move
+        int rowSum = calculateSingleRow(row);
+        int columnSum = calculateSingleColumn(column);
+
+        return checkWinner(rowSum, columnSum);
+    }
+
+    private GameStatusEnum checkDiagonalWinner(int column, int row) {
+        if (row == column || row + column == this.manager.getReferenceArraySize() - 1) {
+            int mainDiagonalSum = calculateMainDiagonal();
+            int secondaryDiagonalSum = calculateSecondaryDiagonal();
+
+            // Checks if either diagonal has a winner
+            return checkWinner(mainDiagonalSum, secondaryDiagonalSum);
+        }
         return null;
     }
 
-    private int calculateSingleRowSum(int row) {
+    private void assignWinner(GameStatusEnum potentialWinner) {
+        if (potentialWinner != null) {
+            this.winner = potentialWinner;
+        }
+    }
+
+    // Checks for a winner based on the sum
+    private GameStatusEnum checkWinner(int sum1, int sum2) {
+        if (sum1 == 3 || sum2 == 3) {
+            return GameStatusEnum.X; // X wins
+        } else if (sum1 == -3 || sum2 == -3) {
+            return GameStatusEnum.O; // O wins
+        }
+        return null; // No winner
+    }
+
+    private int calculateSingleRow(int row) {
         int sum = 0;
         int size = this.manager.getReferenceArraySize();
         for (int i = row; i < size; i++) {
@@ -91,7 +138,7 @@ public class TicTacToeController {
         return sum;
     }
 
-    private int calculateSingleColumnSum(int column) {
+    private int calculateSingleColumn(int column) {
         int sum = 0;
         int size = this.manager.getReferenceArraySize();
         for (int i = 0; i < size; i++) {
